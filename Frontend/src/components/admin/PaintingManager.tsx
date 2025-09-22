@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Search, Filter, Eye } from 'lucide-react';
-import { Painting } from '../../types';
-import { formatCurrency } from '../../utils/currency';
+import React, { useState } from "react";
+import { Plus, Edit, Trash2, Search, Filter, Eye } from "lucide-react";
+import { Painting } from "../../types";
 
 interface PaintingManagerProps {
   paintings: Painting[];
-  onCreatePainting: (painting: Omit<Painting, 'id'>) => boolean;
-  onUpdatePainting: (id: number, updates: Partial<Painting>) => boolean;
-  onDeletePainting: (id: number) => boolean;
+  onCreatePainting: (painting: Omit<Painting, "id">) => Promise<boolean>;
+  onUpdatePainting: (
+    id: number,
+    updates: Partial<Painting>
+  ) => Promise<boolean>;
+  onDeletePainting: (id: number) => Promise<boolean>;
   hasPermission: (resource: string, action: string) => boolean;
 }
 
@@ -16,17 +18,19 @@ export const PaintingManager: React.FC<PaintingManagerProps> = ({
   onCreatePainting,
   onUpdatePainting,
   onDeletePainting,
-  hasPermission
+  hasPermission,
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingPainting, setEditingPainting] = useState<Painting | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterCategory, setFilterCategory] = useState("all");
 
-  const filteredPaintings = paintings.filter(painting => {
-    const matchesSearch = painting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         painting.artist.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || painting.category === filterCategory;
+  const filteredPaintings = paintings.filter((painting) => {
+    const matchesSearch =
+      painting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      painting.artist.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      filterCategory === "all" || painting.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -35,7 +39,7 @@ export const PaintingManager: React.FC<PaintingManagerProps> = ({
       ...formData,
       bidHistory: [],
       watchedBy: 0,
-      similarPaintings: []
+      similarPaintings: [],
     };
 
     if (editingPainting) {
@@ -43,7 +47,7 @@ export const PaintingManager: React.FC<PaintingManagerProps> = ({
     } else {
       onCreatePainting(paintingData);
     }
-    
+
     setShowForm(false);
     setEditingPainting(null);
   };
@@ -54,7 +58,7 @@ export const PaintingManager: React.FC<PaintingManagerProps> = ({
   };
 
   const handleDelete = (id: number) => {
-    if (window.confirm('Are you sure you want to delete this painting?')) {
+    if (window.confirm("Are you sure you want to delete this painting?")) {
       onDeletePainting(id);
     }
   };
@@ -64,10 +68,12 @@ export const PaintingManager: React.FC<PaintingManagerProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Painting Management</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Painting Management
+          </h2>
           <p className="text-gray-600">Manage auction paintings and artwork</p>
         </div>
-        {hasPermission('paintings', 'create') && (
+        {hasPermission("paintings", "create") && (
           <button
             onClick={() => setShowForm(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center space-x-2"
@@ -142,13 +148,17 @@ export const PaintingManager: React.FC<PaintingManagerProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <img
-                        src={painting.image}
+                        src={painting.imageUrl}
                         alt={painting.title}
                         className="h-12 w-12 rounded-lg object-cover mr-4"
                       />
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{painting.title}</div>
-                        <div className="text-sm text-gray-500">{painting.year}</div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {painting.title}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {painting.year}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -161,15 +171,17 @@ export const PaintingManager: React.FC<PaintingManagerProps> = ({
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {formatCurrency(painting.currentBid)}
+                    {/* {formatCurrency(painting.currentBid)} */}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      painting.featured 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {painting.featured ? 'Featured' : 'Active'}
+                    <span
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        painting.featured
+                          ? "bg-green-100 text-green-800"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {painting.featured ? "Featured" : "Active"}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -180,7 +192,7 @@ export const PaintingManager: React.FC<PaintingManagerProps> = ({
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      {hasPermission('paintings', 'update') && (
+                      {hasPermission("paintings", "update") && (
                         <button
                           onClick={() => handleEdit(painting)}
                           className="text-indigo-600 hover:text-indigo-900"
@@ -189,7 +201,7 @@ export const PaintingManager: React.FC<PaintingManagerProps> = ({
                           <Edit className="h-4 w-4" />
                         </button>
                       )}
-                      {hasPermission('paintings', 'delete') && (
+                      {hasPermission("paintings", "delete") && (
                         <button
                           onClick={() => handleDelete(painting.id)}
                           className="text-red-600 hover:text-red-900"
@@ -229,25 +241,21 @@ const PaintingForm: React.FC<{
   onCancel: () => void;
 }> = ({ painting, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
-    title: painting?.title || '',
-    artist: painting?.artist || '',
+    title: painting?.title || "",
+    artist: painting?.artist || "",
     year: painting?.year || new Date().getFullYear(),
-    medium: painting?.medium || '',
-    dimensions: painting?.dimensions || '',
-    currentBid: painting?.currentBid || 0,
+    medium: painting?.medium || "",
+    dimensions: painting?.dimensions || "",
     minBid: painting?.minBid || 0,
-    bidCount: painting?.bidCount || 0,
-    timeLeft: painting?.timeLeft || '24h 00m',
-    image: painting?.image || '',
-    description: painting?.description || '',
-    provenance: painting?.provenance || '',
-    condition: painting?.condition || 'Excellent',
-    category: painting?.category || 'Contemporary',
+    imageUrl: painting?.imageUrl || "",
+    description: painting?.description || "",
+    condition: painting?.condition || "Excellent",
+    category: painting?.category || "Contemporary",
     featured: painting?.featured || false,
     estimate: {
       low: painting?.estimate?.low || 0,
-      high: painting?.estimate?.high || 0
-    }
+      high: painting?.estimate?.high || 0,
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -260,28 +268,36 @@ const PaintingForm: React.FC<{
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b">
           <h3 className="text-lg font-bold text-gray-900">
-            {painting ? 'Edit Painting' : 'Add New Painting'}
+            {painting ? "Edit Painting" : "Add New Painting"}
           </h3>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Title
+              </label>
               <input
                 type="text"
                 value={formData.title}
-                onChange={(e) => setFormData({...formData, title: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Artist</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Artist
+              </label>
               <input
                 type="text"
                 value={formData.artist}
-                onChange={(e) => setFormData({...formData, artist: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, artist: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -290,30 +306,42 @@ const PaintingForm: React.FC<{
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Year
+              </label>
               <input
                 type="number"
                 value={formData.year}
-                onChange={(e) => setFormData({...formData, year: parseInt(e.target.value)})}
+                onChange={(e) =>
+                  setFormData({ ...formData, year: parseInt(e.target.value) })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Medium</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Medium
+              </label>
               <input
                 type="text"
                 value={formData.medium}
-                onChange={(e) => setFormData({...formData, medium: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, medium: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category
+              </label>
               <select
                 value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Contemporary">Contemporary</option>
@@ -327,21 +355,29 @@ const PaintingForm: React.FC<{
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Image URL
+            </label>
             <input
               type="url"
-              value={formData.image}
-              onChange={(e) => setFormData({...formData, image: e.target.value})}
+              value={formData.imageUrl}
+              onChange={(e) =>
+                setFormData({ ...formData, imageUrl: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description
+            </label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
@@ -350,21 +386,35 @@ const PaintingForm: React.FC<{
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Current Bid ($)</label>
-              <input
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current Bid ($)
+              </label>
+              {/* <input
                 type="number"
                 value={formData.currentBid}
-                onChange={(e) => setFormData({...formData, currentBid: parseFloat(e.target.value)})}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    currentBid: parseFloat(e.target.value),
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
-              />
+              /> */}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Bid ($)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Minimum Bid ($)
+              </label>
               <input
                 type="number"
                 value={formData.minBid}
-                onChange={(e) => setFormData({...formData, minBid: parseFloat(e.target.value)})}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    minBid: parseFloat(e.target.value),
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -376,10 +426,15 @@ const PaintingForm: React.FC<{
               type="checkbox"
               id="featured"
               checked={formData.featured}
-              onChange={(e) => setFormData({...formData, featured: e.target.checked})}
+              onChange={(e) =>
+                setFormData({ ...formData, featured: e.target.checked })
+              }
               className="mr-2"
             />
-            <label htmlFor="featured" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="featured"
+              className="text-sm font-medium text-gray-700"
+            >
               Featured Painting
             </label>
           </div>
@@ -396,7 +451,7 @@ const PaintingForm: React.FC<{
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              {painting ? 'Update' : 'Create'} Painting
+              {painting ? "Update" : "Create"} Painting
             </button>
           </div>
         </form>
