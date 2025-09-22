@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Shield, Lock, User } from "lucide-react";
 
-interface AdminLoginProps {
-  onLogin: (email: string, password: string) => boolean;
+// AdminLogin.tsx
+export interface AdminLoginProps {
+  onLogin: (email: string, password: string) => Promise<boolean>;
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {

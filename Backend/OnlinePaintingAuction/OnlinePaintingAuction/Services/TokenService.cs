@@ -3,9 +3,9 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using OnlinePaintingAuction.Models;
+using OnlinePaintingAuction.Api.Models;
 
-namespace OnlinePaintingAuction.Services
+namespace OnlinePaintingAuction.Api.Services
 {
     public interface ITokenService
     {
