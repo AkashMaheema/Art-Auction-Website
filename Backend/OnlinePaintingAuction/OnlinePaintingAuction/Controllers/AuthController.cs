@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OnlinePaintingAuction.Data;
-using OnlinePaintingAuction.DTOs;
-using OnlinePaintingAuction.Models;
-using OnlinePaintingAuction.Services;
+using OnlinePaintingAuction.Api.Data;
+using OnlinePaintingAuction.Api.DTOs;
+using OnlinePaintingAuction.Api.Models;
+using OnlinePaintingAuction.Api.Services;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
