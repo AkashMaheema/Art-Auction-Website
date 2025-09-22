@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace OnlinePaintingAuction.Models
+namespace OnlinePaintingAuction.Api.Models
 {
     public class User
     {
