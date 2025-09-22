@@ -5,27 +5,13 @@ export interface Painting {
   year: number;
   medium: string;
   dimensions: string;
-  currentBid: number;
   minBid: number;
-  bidCount: number;
-  timeLeft: string;
-  image: string;
+  imageUrl: string;
   description: string;
-  provenance: string;
   condition: string;
   estimate: { low: number; high: number };
   category: string;
   featured: boolean;
-  virtualTour?: string;
-  aiAnalysis?: {
-    style: string;
-    emotion: string;
-    technique: string;
-    historicalContext: string;
-  };
-  bidHistory: BidHistoryEntry[];
-  watchedBy: number;
-  similarPaintings: number[];
 }
 
 export interface Artist {
@@ -67,7 +53,7 @@ export interface BidHistoryEntry {
 
 export interface Notification {
   id: number;
-  type: 'bid_outbid' | 'auction_ending' | 'new_similar' | 'price_drop';
+  type: "bid_outbid" | "auction_ending" | "new_similar" | "price_drop";
   message: string;
   timestamp: string;
   read: boolean;

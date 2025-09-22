@@ -1,15 +1,21 @@
-import React, { useState } from 'react';
-import { useAdmin } from '../hooks/useAdmin';
-import { AdminLayout } from '../components/admin/AdminLayout';
-import { AdminLogin } from '../components/admin/AdminLogin';
-import { AdminDashboard } from '../components/admin/AdminDashboard';
-import { PaintingManager } from '../components/admin/PaintingManager';
-import { ArtistManager } from '../components/admin/ArtistManager';
-import { AuctionManager } from '../components/admin/AuctionManager';
-import { AuditLogs } from '../components/admin/AuditLogs';
+import React, { useState } from "react";
+import { useAdmin } from "../hooks/useAdmin";
+import { AdminLayout } from "../components/admin/AdminLayout";
+import { AdminLogin } from "../components/admin/AdminLogin";
+import { AdminDashboard } from "../components/admin/AdminDashboard";
+import { PaintingManager } from "../components/admin/PaintingManager";
+import { ArtistManager } from "../components/admin/ArtistManager";
+import { AuctionManager } from "../components/admin/AuctionManager";
+import { AuditLogs } from "../components/admin/AuditLogs";
+
+// ⬇️ add these
+import { Modal } from "../components/common/Modal";
+import { AddPaintingForm } from "../components/admin/AddPaintingForm";
 
 export const AdminPage: React.FC = () => {
-  const [currentSection, setCurrentSection] = useState('dashboard');
+  const [currentSection, setCurrentSection] = useState("dashboard");
+  const [addPaintingOpen, setAddPaintingOpen] = useState(false);
+
   const {
     paintings,
     artists,
@@ -31,7 +37,7 @@ export const AdminPage: React.FC = () => {
     deleteAuction,
     startAuction,
     pauseAuction,
-    endAuction
+    endAuction,
   } = useAdmin();
 
   if (!currentAdmin) {
@@ -40,9 +46,15 @@ export const AdminPage: React.FC = () => {
 
   const renderSection = () => {
     switch (currentSection) {
-      case 'dashboard':
-        return <AdminDashboard stats={stats} recentLogs={logs.slice(0, 5)} />;
-      case 'paintings':
+      case "dashboard":
+        return (
+          <AdminDashboard
+            stats={stats}
+            recentLogs={logs.slice(0, 5)}
+            onAddPaintingClick={() => setAddPaintingOpen(true)}
+          />
+        );
+      case "paintings":
         return (
           <PaintingManager
             paintings={paintings}
@@ -52,7 +64,7 @@ export const AdminPage: React.FC = () => {
             hasPermission={hasPermission}
           />
         );
-      case 'artists':
+      case "artists":
         return (
           <ArtistManager
             artists={artists}
@@ -62,7 +74,7 @@ export const AdminPage: React.FC = () => {
             hasPermission={hasPermission}
           />
         );
-      case 'auctions':
+      case "auctions":
         return (
           <AuctionManager
             auctions={auctions}
@@ -76,20 +88,28 @@ export const AdminPage: React.FC = () => {
             hasPermission={hasPermission}
           />
         );
-      case 'logs':
+      case "logs":
         return <AuditLogs logs={logs} />;
-      case 'analytics':
+      case "analytics":
         return (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Analytics Dashboard</h3>
-            <p className="text-gray-600">Advanced analytics and reporting features coming soon...</p>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              Analytics Dashboard
+            </h3>
+            <p className="text-gray-600">
+              Advanced analytics and reporting features coming soon...
+            </p>
           </div>
         );
-      case 'settings':
+      case "settings":
         return (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">System Settings</h3>
-            <p className="text-gray-600">System configuration and settings coming soon...</p>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              System Settings
+            </h3>
+            <p className="text-gray-600">
+              System configuration and settings coming soon...
+            </p>
           </div>
         );
       default:
@@ -105,6 +125,39 @@ export const AdminPage: React.FC = () => {
       onLogout={logoutAdmin}
     >
       {renderSection()}
+
+      {/* Add Painting Modal */}
+      <Modal
+        open={addPaintingOpen}
+        onClose={() => setAddPaintingOpen(false)}
+        title="Add Painting"
+      >
+        <AddPaintingForm
+          onCreated={(created) => {
+            // Update local admin list so UI reflects immediately.
+            // Map only fields your Painting type needs (extras are ignored by current manager).
+            createPainting({
+              title: created.title ?? "",
+              artist: created.artist ?? "",
+              category: created.category ?? "General",
+              description: created.description ?? "",
+              imageUrl: created.imageUrl ?? "",
+              minBid: Number(created.minBid ?? 0),
+              featured: Boolean(created.featured),
+              year: Number(created.year ?? new Date().getFullYear()),
+              medium: created.medium ?? "",
+              dimensions: created.dimensions ?? "",
+              condition: created.condition ?? "Excellent",
+              estimate: {
+                low: Number(created.estimateLow ?? 0),
+                high: Number(created.estimateHigh ?? 0),
+              },
+            });
+            setAddPaintingOpen(false);
+          }}
+          onCancel={() => setAddPaintingOpen(false)}
+        />
+      </Modal>
     </AdminLayout>
   );
 };

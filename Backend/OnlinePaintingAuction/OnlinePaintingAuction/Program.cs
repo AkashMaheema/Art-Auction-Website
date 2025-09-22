@@ -2,9 +2,9 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using OnlinePaintingAuction.Data;      // AppDbContext
-using OnlinePaintingAuction.Services;  // TokenService, JwtOptions
-using OnlinePaintingAuction.Models;    // User, Roles
+using OnlinePaintingAuction.Api.Data;      // AppDbContext
+using OnlinePaintingAuction.Api.Services;  // TokenService, JwtOptions
+using OnlinePaintingAuction.Api.Models;    // User, Roles
 using BCrypt.Net;      // alias for BCrypt
 
 var builder = WebApplication.CreateBuilder(args);
