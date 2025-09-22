@@ -1,4 +1,4 @@
-﻿namespace OnlinePaintingAuction.DTOs
+﻿namespace OnlinePaintingAuction.Api.DTOs
 {
     public class SetRoleRequest
     {

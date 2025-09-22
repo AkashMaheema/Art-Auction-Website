@@ -1,11 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OnlinePaintingAuction.Data;
-using OnlinePaintingAuction.DTOs;
-using OnlinePaintingAuction.Models;
+using OnlinePaintingAuction.Api.Data;
+using OnlinePaintingAuction.Api.DTOs;
+using OnlinePaintingAuction.Api.Models;
 
-namespace OnlinePaintingAuction.Controllers
+namespace OnlinePaintingAuction.Api.Controllers
 {
     [ApiController]
     [Route("api/admin/users")]
