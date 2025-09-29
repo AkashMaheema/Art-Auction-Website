@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Painting, Artist } from "../types";
 import type { Auction } from "../types/auction";
 import type { AdminUser, AdminStats, AuditLog } from "../types/admin";
-import { useAuctions } from "./useAuctions";
 import api from "../utils/api";
 
-/** ===== Helpers ===== */
+/* =========================
+   JWT helpers
+========================= */
 
 type JwtPayload = {
-  nameid?: string; // ClaimTypes.NameIdentifier
-  unique_name?: string; // ClaimTypes.Name
+  sub?: string;
+  nameid?: string;
+  unique_name?: string;
   email?: string;
   role?: string | string[];
   exp?: number;
@@ -18,8 +20,8 @@ type JwtPayload = {
 
 function decodeJwt<T = JwtPayload>(token: string): T | null {
   try {
-    const base64 = token.split(".")[1];
-    const json = atob(base64.replace(/-/g, "+").replace(/_/g, "/"));
+    const b = token.split(".")[1];
+    const json = atob(b.replace(/-/g, "+").replace(/_/g, "/"));
     return JSON.parse(decodeURIComponent(escape(json)));
   } catch {
     return null;
@@ -28,16 +30,21 @@ function decodeJwt<T = JwtPayload>(token: string): T | null {
 
 const isAdminRole = (role?: string | string[]) => {
   if (!role) return false;
-  if (Array.isArray(role)) return role.some((r) => r.toLowerCase() === "admin");
-  return role.toLowerCase() === "admin";
+  const roles = Array.isArray(role) ? role : [role];
+  return roles.some((r) => r.toLowerCase() === "admin");
 };
 
-/** Backend DTO for /paintings */
+/* =========================
+   Backend DTOs
+========================= */
+
+/** Paintings */
 type PaintingDto = {
   id: number;
   title: string;
-  artist: string;
-  category: string;
+  artistId: number;
+  artistName: string;
+  category?: string | null;
   description?: string | null;
   imageUrl?: string | null;
   minBid: number;
@@ -48,21 +55,83 @@ type PaintingDto = {
   condition?: string | null;
   estimateLow?: number | null;
   estimateHigh?: number | null;
-  createdAtUtc: string;
-  updatedAtUtc?: string | null;
 };
 
-const mapDtoToPainting = (dto: PaintingDto): Painting => ({
+type CreatePaintingPayload = {
+  title: string;
+  artistId: number;
+  category?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  minBid: number;
+  featured?: boolean;
+  year?: number | null;
+  medium?: string | null;
+  dimensions?: string | null;
+  condition?: string | null;
+  estimateLow?: number | null;
+  estimateHigh?: number | null;
+};
+
+type UpdatePaintingPayload = Partial<CreatePaintingPayload>;
+
+/** Artists */
+type ArtistDto = {
+  id: number;
+  name: string;
+  bio?: string | null;
+  image?: string | null;
+  nationality?: string | null;
+  birthYear?: number | null;
+  style?: string | null;
+  verified: boolean;
+  totalSales?: number | null;
+  averagePrice?: number | null;
+  trending: boolean;
+};
+
+type CreateArtistPayload = Omit<ArtistDto, "id">;
+type UpdateArtistPayload = Partial<CreateArtistPayload>;
+
+/** Auctions */
+type AuctionDto = {
+  id: number;
+  title: string;
+  description?: string | null;
+  startsAtUtc: string; // ISO
+  endsAtUtc: string; // ISO
+  status: "Scheduled" | "Live" | "Paused" | "Ended";
+  paintingIds: number[];
+};
+
+type CreateAuctionPayload = {
+  title: string;
+  description?: string | null;
+  startsAtUtc: string; // ISO
+  endsAtUtc: string; // ISO
+  paintingIds?: number[];
+};
+
+type UpdateAuctionPayload = Partial<CreateAuctionPayload>;
+type SetAuctionStatusPayload = { status: AuctionDto["status"] };
+type SetAuctionPaintingsPayload = { paintingIds: number[] };
+
+/* =========================
+   mappers (server -> UI)
+========================= */
+
+const mapPaintingDto = (
+  dto: PaintingDto
+): Painting & { artistId: number; artistName: string } => ({
   id: dto.id,
   title: dto.title,
-  artist: dto.artist,
+  artist: dto.artistName, // keep existing UI field
+  artistId: dto.artistId, // extra for admin forms
+  artistName: dto.artistName, // extra for display
   year: dto.year ?? 0,
   medium: dto.medium ?? "",
   dimensions: dto.dimensions ?? "",
-
-  // UI-only fields – set safe defaults until bids feature arrives
   minBid: dto.minBid,
-
   imageUrl: dto.imageUrl ?? "",
   description: dto.description ?? "",
   condition: dto.condition ?? "",
@@ -74,11 +143,45 @@ const mapDtoToPainting = (dto: PaintingDto): Painting => ({
   featured: dto.featured ?? false,
 });
 
-/** ===== Hook ===== */
+const mapArtistDto = (dto: ArtistDto): Artist => ({
+  id: dto.id,
+  name: dto.name,
+  bio: dto.bio ?? "",
+  image: dto.image ?? "",
+  nationality: dto.nationality ?? "",
+  birthYear: dto.birthYear ?? 0,
+  style: dto.style ?? "",
+  verified: dto.verified,
+  totalSales: dto.totalSales ?? 0,
+  averagePrice: dto.averagePrice ?? 0,
+  trending: dto.trending,
+});
+
+const mapAuctionDto = (
+  dto: AuctionDto
+): Auction & { paintingIds: number[]; status: AuctionDto["status"] } => ({
+  id: dto.id,
+  title: dto.title,
+  description: dto.description ?? "",
+  startTime: dto.startsAtUtc,
+  endTime: dto.endsAtUtc,
+  // extend with backend fields used in admin screens
+  paintingIds: dto.paintingIds ?? [],
+  status: dto.status,
+});
+
+/* =========================
+   Hook
+========================= */
 
 export const useAdmin = () => {
-  const [paintings, setPaintings] = useState<Painting[]>([]);
-  const [artists, setArtists] = useState<Artist[]>([]); // TODO: hook up when /artists exists
+  const [paintings, setPaintings] = useState<
+    (Painting & { artistId?: number; artistName?: string })[]
+  >([]);
+  const [artists, setArtists] = useState<Artist[]>([]);
+  const [auctions, setAuctions] = useState<
+    (Auction & { paintingIds?: number[]; status?: AuctionDto["status"] })[]
+  >([]);
   const [stats, setStats] = useState<AdminStats>({
     totalRevenue: 0,
     totalPaintings: 0,
@@ -90,20 +193,9 @@ export const useAdmin = () => {
   });
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
 
-  // Auctions (leave as-is for now; you can wire API later)
-  const {
-    auctions,
-    createAuction: createAuctionHook,
-    updateAuction: updateAuctionHook,
-    deleteAuction: deleteAuctionHook,
-    startAuction,
-    pauseAuction,
-    endAuction,
-  } = useAuctions();
-
-  /** ===== Auth ===== */
+  /* ===== Auth ===== */
 
   const loginAdmin = async (
     email: string,
@@ -114,26 +206,28 @@ export const useAdmin = () => {
       const { token, name, role } = res.data || {};
       if (!token) return false;
 
-      localStorage.setItem("token", token); // api interceptor should pick this up
+      localStorage.setItem("token", token);
 
       const payload = decodeJwt(token) || {};
       const admin: AdminUser = {
-        id: Number(payload.nameid || payload.sub || 0),
-        email: email,
-        name: name || (payload.unique_name as string) || email,
-        permissions: [], // optional: fetch from your backend later
-        isActive: true,
+        id:
+          payload.sub || payload.nameid
+            ? Number(payload.sub || payload.nameid)
+            : 0,
+        email,
+        name: (name as string) || (payload.unique_name as string) || email,
         role:
           (Array.isArray(role) ? role[0] : role) ||
           (payload.role as string) ||
           "Bidder",
+        permissions: [],
+        isActive: true,
         lastLogin: new Date().toISOString(),
       };
 
       setCurrentAdmin(admin);
       addAuditLog("LOGIN", "system", 0, `Admin ${admin.name} logged in`);
 
-      // Load data right after login
       await refreshAll();
       return true;
     } catch (err) {
@@ -144,27 +238,22 @@ export const useAdmin = () => {
 
   const logoutAdmin = () => {
     localStorage.removeItem("token");
-    if (currentAdmin) {
+    if (currentAdmin)
       addAuditLog(
         "LOGOUT",
         "system",
         0,
         `Admin ${currentAdmin.name} logged out`
       );
-    }
     setCurrentAdmin(null);
   };
 
-  /** ===== Permissions ===== */
-
-  const hasPermission = (resource: string, action: string): boolean => {
+  const hasPermission = (_resource: string, _action: string) => {
     if (!currentAdmin) return false;
-    // Simple rule: Admin => full; others => none (until you model fine-grained perms)
-    if (isAdminRole(currentAdmin.role)) return true;
-    return false;
+    return isAdminRole(currentAdmin.role);
   };
 
-  /** ===== Audit log (front-end only for now) ===== */
+  /* ===== Audit (client-side) ===== */
 
   const addAuditLog = (
     action: string,
@@ -173,7 +262,7 @@ export const useAdmin = () => {
     details: string
   ) => {
     if (!currentAdmin) return;
-    const newLog: AuditLog = {
+    const log: AuditLog = {
       id: Date.now(),
       adminId: currentAdmin.id,
       adminName: currentAdmin.name,
@@ -183,39 +272,39 @@ export const useAdmin = () => {
       timestamp: new Date().toISOString(),
       details,
     };
-    setLogs((prev) => [newLog, ...prev]);
+    setLogs((prev) => [log, ...prev]);
   };
 
-  /** ===== Paintings API ===== */
+  /* ===== Paintings ===== */
 
   const loadPaintings = useCallback(async () => {
     const res = await api.get<PaintingDto[]>("/paintings");
-    setPaintings(res.data.map(mapDtoToPainting));
+    setPaintings(res.data.map(mapPaintingDto));
   }, []);
 
-  const createPainting = async (paintingData: Omit<Painting, "id">) => {
+  const createPainting = async (
+    p: Omit<Painting, "id"> & { artistId: number }
+  ) => {
     if (!hasPermission("paintings", "create")) return false;
 
-    // Map UI -> API
-    const payload = {
-      title: paintingData.title,
-      artist: paintingData.artist,
-      category: paintingData.category || "General",
-      description: paintingData.description || undefined,
-      imageUrl: paintingData.imageUrl || undefined,
-      minBid: paintingData.minBid ?? 0,
-      featured: !!paintingData.featured,
-      year: paintingData.year ?? undefined,
-      medium: paintingData.medium || undefined,
-      dimensions: paintingData.dimensions || undefined,
-      condition: paintingData.condition || undefined,
-      estimateLow: paintingData.estimate?.low ?? undefined,
-      estimateHigh: paintingData.estimate?.high ?? undefined,
+    const payload: CreatePaintingPayload = {
+      title: p.title,
+      artistId: p.artistId,
+      category: p.category ?? "General",
+      description: p.description || null,
+      imageUrl: p.imageUrl || null,
+      minBid: p.minBid ?? 0,
+      featured: !!p.featured,
+      year: p.year ?? null,
+      medium: p.medium || null,
+      dimensions: p.dimensions || null,
+      condition: p.condition || null,
+      estimateLow: p.estimate?.low ?? null,
+      estimateHigh: p.estimate?.high ?? null,
     };
-    console.log("Creating painting with payload:", payload);
 
     const res = await api.post<PaintingDto>("/paintings", payload);
-    const created = mapDtoToPainting(res.data);
+    const created = mapPaintingDto(res.data);
     setPaintings((prev) => [created, ...prev]);
     addAuditLog(
       "CREATE",
@@ -227,12 +316,15 @@ export const useAdmin = () => {
     return true;
   };
 
-  const updatePainting = async (id: number, updates: Partial<Painting>) => {
+  const updatePainting = async (
+    id: number,
+    updates: Partial<Painting> & { artistId?: number }
+  ) => {
     if (!hasPermission("paintings", "update")) return false;
 
-    const payload = {
+    const payload: UpdatePaintingPayload = {
       title: updates.title,
-      artist: updates.artist,
+      artistId: updates.artistId,
       category: updates.category,
       description: updates.description,
       imageUrl: updates.imageUrl,
@@ -245,138 +337,233 @@ export const useAdmin = () => {
       estimateLow: updates.estimate?.low,
       estimateHigh: updates.estimate?.high,
     };
-    console.log("Updating painting with payload:", payload);
-
+    console.log("Updating painting:", id, payload);
     await api.put(`/paintings/${id}`, payload);
     setPaintings((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+      prev.map((pp) =>
+        pp.id === id
+          ? {
+              ...pp,
+              ...updates,
+              // if artistId changed, you may want to refresh list to get artistName
+            }
+          : pp
+      )
     );
-
-    const p = paintings.find((x) => x.id === id);
-    addAuditLog(
-      "UPDATE",
-      "painting",
-      id,
-      `Updated painting: ${p?.title ?? id}`
-    );
+    addAuditLog("UPDATE", "painting", id, `Updated painting #${id}`);
     return true;
   };
 
   const deletePainting = async (id: number) => {
     if (!hasPermission("paintings", "delete")) return false;
-
     await api.delete(`/paintings/${id}`);
-    const removed = paintings.find((p) => p.id === id);
     setPaintings((prev) => prev.filter((p) => p.id !== id));
+    addAuditLog("DELETE", "painting", id, `Deleted painting #${id}`);
+    recalcStats();
+    return true;
+  };
+
+  /* ===== Artists ===== */
+
+  const loadArtists = useCallback(async () => {
+    const res = await api.get<ArtistDto[]>("/artists");
+    console.log("Loaded artists:", res.data);
+    setArtists(res.data.map(mapArtistDto));
+  }, []);
+
+  const createArtist = async (a: Omit<Artist, "id">) => {
+    if (!hasPermission("artists", "create")) return false;
+
+    const payload: CreateArtistPayload = {
+      name: a.name,
+      bio: a.bio || null,
+      image: a.image || null,
+      nationality: a.nationality || null,
+      birthYear: a.birthYear ?? null,
+      style: a.style || null,
+      verified: !!a.verified,
+      totalSales: a.totalSales ?? 0,
+      averagePrice: a.averagePrice ?? 0,
+      trending: !!a.trending,
+    };
+
+    const res = await api.post<ArtistDto>("/artists", payload);
+    const created = mapArtistDto(res.data);
+    setArtists((prev) => [created, ...prev]);
     addAuditLog(
-      "DELETE",
-      "painting",
-      id,
-      `Deleted painting: ${removed?.title ?? id}`
+      "CREATE",
+      "artist",
+      created.id,
+      `Added artist: ${created.name}`
     );
     recalcStats();
     return true;
   };
 
-  /** ===== Artists (stub until backend exists) ===== */
+  const updateArtist = async (id: number, updates: Partial<Artist>) => {
+    if (!hasPermission("artists", "update")) return false;
 
-  const loadArtists = useCallback(async () => {
-    // If you add /artists endpoints, replace this with a real call
-    setArtists([]);
+    const payload: UpdateArtistPayload = {
+      name: updates.name,
+      bio: updates.bio,
+      image: updates.image,
+      nationality: updates.nationality,
+      birthYear: updates.birthYear,
+      style: updates.style,
+      verified: updates.verified,
+      totalSales: updates.totalSales,
+      averagePrice: updates.averagePrice,
+      trending: updates.trending,
+    };
+
+    await api.put(`/artists/${id}`, payload);
+    setArtists((prev) =>
+      prev.map((a) => (a.id === id ? ({ ...a, ...updates } as Artist) : a))
+    );
+    addAuditLog("UPDATE", "artist", id, `Updated artist #${id}`);
+    return true;
+  };
+
+  const deleteArtist = async (id: number) => {
+    if (!hasPermission("artists", "delete")) return false;
+    await api.delete(`/artists/${id}`);
+    setArtists((prev) => prev.filter((a) => a.id !== id));
+    addAuditLog("DELETE", "artist", id, `Deleted artist #${id}`);
+    recalcStats();
+    return true;
+  };
+
+  /* ===== Auctions (real API) ===== */
+
+  const loadAuctions = useCallback(async () => {
+    const res = await api.get<AuctionDto[]>("/auctions");
+    setAuctions(res.data.map(mapAuctionDto));
   }, []);
 
-  const createArtist = async (_artistData: Omit<Artist, "id">) => {
-    if (!hasPermission("artists", "create")) return false;
-    // TODO: call POST /artists and update state
-    return false;
-  };
-
-  const updateArtist = async (_id: number, _updates: Partial<Artist>) => {
-    if (!hasPermission("artists", "update")) return false;
-    // TODO: call PUT /artists/:id and update state
-    return false;
-  };
-
-  const deleteArtist = async (_id: number) => {
-    if (!hasPermission("artists", "delete")) return false;
-    // TODO: call DELETE /artists/:id and update state
-    return false;
-  };
-
-  /** ===== Auctions (using your existing local hook for now) ===== */
-
-  const createAuction = (auctionData: Omit<Auction, "id">) => {
+  const createAuction = async (
+    a: Omit<Auction, "id"> & { paintingIds?: number[] }
+  ) => {
     if (!hasPermission("auctions", "create")) return false;
-    const ok = createAuctionHook(auctionData);
-    if (ok)
-      addAuditLog(
-        "CREATE",
-        "auction",
-        0,
-        `Created auction: ${auctionData.title}`
-      );
-    return ok;
+
+    const payload: CreateAuctionPayload = {
+      title: a.title,
+      description: (a as any).description ?? null, // adapt if your Auction type differs
+      startsAtUtc: (a as any).startTime, // ensure ISO strings
+      endsAtUtc: (a as any).endTime,
+      paintingIds: a.paintingIds ?? [],
+    };
+
+    const res = await api.post<AuctionDto>("/auctions", payload);
+    const created = mapAuctionDto(res.data);
+    setAuctions((prev) => [created, ...prev]);
+    addAuditLog(
+      "CREATE",
+      "auction",
+      created.id,
+      `Created auction: ${created.title}`
+    );
+    return true;
   };
 
-  const updateAuction = (id: number, updates: Partial<Auction>) => {
+  const updateAuction = async (
+    id: number,
+    updates: Partial<Auction> & { paintingIds?: number[] }
+  ) => {
     if (!hasPermission("auctions", "update")) return false;
-    const ok = updateAuctionHook(id, updates);
-    if (ok) addAuditLog("UPDATE", "auction", id, `Updated auction #${id}`);
-    return ok;
+
+    const payload: UpdateAuctionPayload = {
+      title: updates.title,
+      description: (updates as any).description,
+      startsAtUtc: (updates as any).startTime,
+      endsAtUtc: (updates as any).endTime,
+      paintingIds: (updates as any).paintingIds, // typically you’ll call the dedicated endpoint below
+    };
+
+    await api.put(`/auctions/${id}`, payload);
+    setAuctions((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
+    );
+    addAuditLog("UPDATE", "auction", id, `Updated auction #${id}`);
+    return true;
   };
 
-  const deleteAuction = (id: number) => {
+  const deleteAuction = async (id: number) => {
     if (!hasPermission("auctions", "delete")) return false;
-    const ok = deleteAuctionHook(id);
-    if (ok) addAuditLog("DELETE", "auction", id, `Deleted auction #${id}`);
-    return ok;
+    await api.delete(`/auctions/${id}`);
+    setAuctions((prev) => prev.filter((a) => a.id !== id));
+    addAuditLog("DELETE", "auction", id, `Deleted auction #${id}`);
+    return true;
   };
 
-  const startAuctionAdmin = (id: number) => {
+  // set paintings for an auction (replace all)
+  const setAuctionPaintings = async (
+    auctionId: number,
+    paintingIds: number[]
+  ) => {
     if (!hasPermission("auctions", "update")) return false;
-    const ok = startAuction(id);
-    if (ok) addAuditLog("UPDATE", "auction", id, `Started auction #${id}`);
-    return ok;
+    const payload: SetAuctionPaintingsPayload = { paintingIds };
+    await api.put(`/auctions/${auctionId}/paintings`, payload);
+    setAuctions((prev) =>
+      prev.map((a) => (a.id === auctionId ? { ...a, paintingIds } : a))
+    );
+    addAuditLog(
+      "UPDATE",
+      "auction",
+      auctionId,
+      `Set ${paintingIds.length} painting(s)`
+    );
+    return true;
   };
 
-  const pauseAuctionAdmin = (id: number) => {
+  // status changes: "Live" | "Paused" | "Ended"
+  const setAuctionStatus = async (
+    auctionId: number,
+    status: AuctionDto["status"]
+  ) => {
     if (!hasPermission("auctions", "update")) return false;
-    const ok = pauseAuction(id);
-    if (ok) addAuditLog("UPDATE", "auction", id, `Paused auction #${id}`);
-    return ok;
+    const payload: SetAuctionStatusPayload = { status };
+    await api.put(`/auctions/${auctionId}/status`, payload);
+    setAuctions((prev) =>
+      prev.map((a) => (a.id === auctionId ? { ...a, status } : a))
+    );
+    addAuditLog("UPDATE", "auction", auctionId, `Status -> ${status}`);
+    return true;
   };
 
-  const endAuctionAdmin = (id: number) => {
-    if (!hasPermission("auctions", "update")) return false;
-    const ok = endAuction(id);
-    if (ok) addAuditLog("UPDATE", "auction", id, `Ended auction #${id}`);
-    return ok;
-  };
+  const startAuction = (id: number) => setAuctionStatus(id, "Live");
+  const pauseAuction = (id: number) => setAuctionStatus(id, "Paused");
+  const endAuction = (id: number) => setAuctionStatus(id, "Ended");
 
-  /** ===== Stats ===== */
+  /* ===== Stats ===== */
 
   const recalcStats = useCallback(() => {
     setStats((prev) => ({
       ...prev,
       totalPaintings: paintings.length,
       totalArtists: artists.length,
-      // Keep others zero until you have backend support (revenue/bids/users)
+      // You can expand these via future Admin stats endpoint
+      totalBids: prev.totalBids,
+      totalUsers: prev.totalUsers,
+      totalRevenue: prev.totalRevenue,
+      activeBidders: prev.activeBidders,
+      pendingApprovals: prev.pendingApprovals,
     }));
   }, [paintings.length, artists.length]);
 
-  /** ===== Bulk refresh ===== */
+  /* ===== Bulk refresh ===== */
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      await Promise.all([loadPaintings(), loadArtists()]);
+      // Load in parallel
+      await Promise.all([loadArtists(), loadPaintings(), loadAuctions()]);
       recalcStats();
     } finally {
       setLoading(false);
     }
-  }, [loadPaintings, loadArtists, recalcStats]);
+  }, [loadArtists, loadPaintings, loadAuctions, recalcStats]);
 
-  /** ===== Auto-load when token exists ===== */
+  /* ===== Auto-load if token exists ===== */
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -386,28 +573,28 @@ export const useAdmin = () => {
     if (!payload) return;
 
     const admin: AdminUser = {
-      id: Number(payload.nameid || payload.sub || 0),
+      id: Number(payload.sub || payload.nameid || 0),
       email: (payload.email as string) || "",
       name: (payload.unique_name as string) || "",
+      role: (() => {
+        const allowedRoles = ["super_admin", "admin", "moderator"] as const;
+        let roleValue: string | undefined;
+        if (payload.role === "super_admin") return "super_admin";
+        if (Array.isArray(payload.role)) roleValue = payload.role[0];
+        else roleValue = payload.role;
+        return allowedRoles.includes(roleValue as any)
+          ? (roleValue as (typeof allowedRoles)[number])
+          : "admin";
+      })(),
       permissions: [],
       isActive: true,
-      role:
-        payload.role === "super_admin"
-          ? "super_admin"
-          : payload.role === "admin"
-          ? "admin"
-          : payload.role === "moderator"
-          ? "moderator"
-          : "admin",
       lastLogin: "",
     };
     setCurrentAdmin(admin);
-
-    // Preload data
     refreshAll();
   }, [refreshAll]);
 
-  /** ===== Expose API ===== */
+  /* ===== Expose ===== */
 
   return {
     // Data
@@ -424,25 +611,29 @@ export const useAdmin = () => {
     logoutAdmin,
     hasPermission,
 
-    // Painting Operations (real API)
+    // Paintings
+    loadPaintings,
     createPainting,
     updatePainting,
     deletePainting,
 
-    // Artist Operations (stubs until backend exists)
+    // Artists
+    loadArtists,
     createArtist,
     updateArtist,
     deleteArtist,
 
-    // Auction Operations (local for now)
+    // Auctions
+    loadAuctions,
     createAuction,
     updateAuction,
     deleteAuction,
-    startAuction: startAuctionAdmin,
-    pauseAuction: pauseAuctionAdmin,
-    endAuction: endAuctionAdmin,
+    setAuctionPaintings,
+    startAuction,
+    pauseAuction,
+    endAuction,
 
-    // Utilities
+    // Utils
     refreshAll,
   };
 };

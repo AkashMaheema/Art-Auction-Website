@@ -10,6 +10,7 @@
         public string? Category { get; set; }
         public decimal MinBid { get; set; }
         public bool Featured { get; set; }
+
     }
 
     public class PaintingDto : PaintingSummaryDto

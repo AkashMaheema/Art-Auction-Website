@@ -55,6 +55,7 @@ namespace OnlinePaintingAuction.Api.Features.Artists
                     Image = a.Image,
                     Nationality = a.Nationality,
                     BirthYear = a.BirthYear,
+                    Bio = a.Bio,
                     Style = a.Style,
                     Verified = a.Verified,
                     Trending = a.Trending,

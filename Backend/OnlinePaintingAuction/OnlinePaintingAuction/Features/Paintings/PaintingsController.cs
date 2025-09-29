@@ -17,25 +17,26 @@ namespace OnlinePaintingAuction.Api.Features.Paintings
 
         // ===== VIEW (Admin + Bidder) =====
         // Filters: q (title/artist), category, artistId, featured
-        [Authorize(Roles = $"{Roles.Admin},{Roles.Bidder}")]
+        [AllowAnonymous] // or keep [Authorize(...)] if you want it protected
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<PaintingSummaryDto>>> GetAll(
-            [FromQuery] string? q,
-            [FromQuery] string? category,
-            [FromQuery] int? artistId,
-            [FromQuery] bool? featured)
+        public async Task<ActionResult<IEnumerable<PaintingDto>>> GetAll(
+    [FromQuery] string? q,
+    [FromQuery] string? category,
+    [FromQuery] int? artistId,
+    [FromQuery] bool? featured)
         {
             var query = _db.Paintings
                 .AsNoTracking()
                 .Include(p => p.ArtistRef)
                 .AsQueryable();
 
+            // Text search (title or artist name), SQLite-safe
             if (!string.IsNullOrWhiteSpace(q))
             {
-                var term = q.ToLower();
+                var like = $"%{q.Trim()}%";
                 query = query.Where(p =>
-                    p.Title.ToLower().Contains(term) ||
-                    p.ArtistRef.Name.ToLower().Contains(term));
+                    EF.Functions.Like(p.Title, like) ||
+                    (p.ArtistRef != null && EF.Functions.Like(p.ArtistRef.Name, like)));
             }
 
             if (!string.IsNullOrWhiteSpace(category) && category != "all")
@@ -50,16 +51,25 @@ namespace OnlinePaintingAuction.Api.Features.Paintings
             var list = await query
                 .OrderByDescending(p => p.Featured)
                 .ThenBy(p => p.Title)
-                .Select(p => new PaintingSummaryDto
+                .Select(p => new PaintingDto
                 {
                     Id = p.Id,
                     Title = p.Title,
                     ArtistId = p.ArtistId,
-                    ArtistName = p.ArtistRef.Name,
+                    ArtistName = p.ArtistRef != null ? p.ArtistRef.Name : p.Artist, // fallback to legacy text if needed
                     ImageUrl = p.ImageUrl,
                     Category = p.Category,
                     MinBid = p.MinBid,
-                    Featured = p.Featured
+                    Featured = p.Featured,
+
+                    // full detail fields:
+                    Description = p.Description,
+                    Year = p.Year,
+                    Medium = p.Medium,
+                    Dimensions = p.Dimensions,
+                    Condition = p.Condition,
+                    EstimateLow = p.EstimateLow,
+                    EstimateHigh = p.EstimateHigh
                 })
                 .ToListAsync();
 
@@ -187,7 +197,6 @@ namespace OnlinePaintingAuction.Api.Features.Paintings
             if (req.EstimateLow.HasValue) p.EstimateLow = req.EstimateLow.Value;
             if (req.EstimateHigh.HasValue) p.EstimateHigh = req.EstimateHigh.Value;
 
-            // ✅ allow switching artist
             if (req.ArtistId.HasValue)
             {
                 var artist = await _db.Artists.AsNoTracking().FirstOrDefaultAsync(a => a.Id == req.ArtistId.Value);
