@@ -17,7 +17,7 @@ namespace OnlinePaintingAuction.Api.Features.Auctions
         // ===== VIEW (Admin + Bidder) =====
         [Authorize(Roles = $"{Roles.Admin},{Roles.Bidder}")]
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<AuctionSummaryDto>>> GetAll(
+        public async Task<ActionResult<IEnumerable<AuctionDto>>> GetAll(
             [FromQuery] string? q,
             [FromQuery] string? status)
         {
@@ -42,14 +42,17 @@ namespace OnlinePaintingAuction.Api.Features.Auctions
 
             var list = await query
                 .OrderBy(a => a.StartsAtUtc)
-                .Select(a => new AuctionSummaryDto
+                .Select(a => new AuctionDto
                 {
                     Id = a.Id,
                     Title = a.Title,
+                    Description = a.Description,
                     StartsAtUtc = a.StartsAtUtc,
                     EndsAtUtc = a.EndsAtUtc,
                     Status = a.Status.ToString(),
-                    PaintingIds = a.Paintings.Select(p => p.Id).ToList()
+                    PaintingIds = a.Paintings.Select(p => p.Id).ToList(),
+                    CreatedAtUtc = a.CreatedAtUtc,
+                    UpdatedAtUtc = a.UpdatedAtUtc
                 })
                 .ToListAsync();
 
@@ -80,6 +83,8 @@ namespace OnlinePaintingAuction.Api.Features.Auctions
                 UpdatedAtUtc = a.UpdatedAtUtc
             });
         }
+
+
 
         // ===== ADMIN (Create/Update/Delete) =====
         [Authorize(Roles = Roles.Admin)]

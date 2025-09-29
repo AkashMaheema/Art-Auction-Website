@@ -17,7 +17,7 @@
 
     public class ArtistDto : ArtistSummaryDto
     {
-        public string? Bio { get; set; }
+        public new string? Bio { get; set; } 
         public DateTime CreatedAtUtc { get; set; }
         public DateTime? UpdatedAtUtc { get; set; }
     }

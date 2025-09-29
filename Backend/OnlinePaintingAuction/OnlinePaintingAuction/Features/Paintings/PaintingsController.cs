@@ -20,10 +20,10 @@ namespace OnlinePaintingAuction.Api.Features.Paintings
         [AllowAnonymous] // or keep [Authorize(...)] if you want it protected
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PaintingDto>>> GetAll(
-    [FromQuery] string? q,
-    [FromQuery] string? category,
-    [FromQuery] int? artistId,
-    [FromQuery] bool? featured)
+        [FromQuery] string? q,
+        [FromQuery] string? category,
+        [FromQuery] int? artistId,
+        [FromQuery] bool? featured)
         {
             var query = _db.Paintings
                 .AsNoTracking()

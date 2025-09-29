@@ -1,4 +1,9 @@
-export type AuctionStatus = "Scheduled" | "Live" | "Paused" | "Ended";
+export type AuctionStatus =
+  | "Scheduled"
+  | "Live"
+  | "Paused"
+  | "Ended"
+  | "Cancelled";
 
 export interface Auction {
   id: number;
