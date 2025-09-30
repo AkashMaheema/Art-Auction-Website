@@ -198,15 +198,9 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       {currentPage === "admin" ? (
         <Routes>
-          <Route
-            path="/admin"
-            element={
-              <RequireAdmin>
-                <AdminPage />
-              </RequireAdmin>
-            }
-          />
-          <Route path="*" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin/*" element={<AdminPage />} />
+
+          <Route path="*" element={<Navigate to="/admin/*" replace />} />
         </Routes>
       ) : (
         <>
