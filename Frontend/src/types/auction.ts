@@ -1,41 +1,31 @@
-export type AuctionStatus = 'draft' | 'scheduled' | 'live' | 'paused' | 'ended' | 'cancelled';
+export type AuctionStatus =
+  | "Scheduled"
+  | "Live"
+  | "Paused"
+  | "Ended"
+  | "Cancelled";
 
 export interface Auction {
   id: number;
   title: string;
-  description: string;
+  /** ISO string mapped from backend `startsAtUtc` */
   startTime: string;
+  /** ISO string mapped from backend `endsAtUtc` */
   endTime: string;
   status: AuctionStatus;
+  /** From backend `paintingIds` */
   paintingIds: number[];
-  totalBidders: number;
-  totalRevenue: number;
-  reservePrice: number;
-  incrementAmount: number;
-  maxBidIncrement: number;
-  featured: boolean;
-  allowAbsenteeBids: boolean;
-  createdAt: string;
-  updatedAt: string;
+  /** Optional (backend `description` is nullable) */
+  description?: string | null;
 }
 
 export interface AuctionBid {
   id: number;
   auctionId: number;
   paintingId: number;
-  userId: number;
-  userName: string;
+  /** Backend user id is a GUID string */
+  userId: string;
   amount: number;
+  /** ISO string mapped from backend `CreatedAtUtc` */
   timestamp: string;
-  isAbsentee: boolean;
-  isWinning: boolean;
-}
-
-export interface AuctionEvent {
-  id: number;
-  auctionId: number;
-  type: 'start' | 'pause' | 'resume' | 'end' | 'bid_placed' | 'item_sold';
-  description: string;
-  timestamp: string;
-  metadata?: Record<string, any>;
 }
